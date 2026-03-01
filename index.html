@@ -88,33 +88,30 @@
             try {
                 const targetUrl = 'http://165.232.68.11:8080/api/stats';
                 let fetchUrl = targetUrl;
-                let useProxy = false;
-
-                // HTTPS ortamındaysak proxy kullan
+                
+                // HTTPS engeli için en güvenilir yöntem: corsproxy.io
                 if (window.location.protocol === 'https:') {
-                    useProxy = true;
-                    // cors-anywhere genellikle daha güvenilirdir (kendi public instance'ını kullanır)
-                    // Ancak public instance'lar için geçici erişim gerekebilir.
-                    // Alternatif olarak 'https://api.allorigins.win/get?url=' kullanıyoruz, fakat JSON ayrıştırmasına dikkat ediyoruz.
-                    fetchUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(targetUrl);
+                    fetchUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
                 }
 
-                const response = await fetch(fetchUrl);
+                const response = await fetch(fetchUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    // İstek zaman aşımını kısa tutalım ki hata anında hızlı dönsün
+                    signal: AbortSignal.timeout(8000)
+                });
                 
                 if (!response.ok) {
                     throw new Error(`HTTP Error: ${response.status}`);
                 }
                 
-                let data = await response.json();
+                const data = await response.json();
 
-                // allorigins kullanıldığında asıl veri 'contents' içindedir (eğer /get kullanıldıysa)
-                if (useProxy && data.contents) {
-                    try {
-                        data = JSON.parse(data.contents);
-                    } catch (e) {
-                        console.error("Proxy yanıtı JSON formatında değil:", data.contents);
-                        throw new Error("Veri ayrıştırma hatası.");
-                    }
+                // Eğer proxy html dönerse (hata sayfası) json beklediğimiz için patlarız
+                if (data && typeof data !== 'object') {
+                   throw new Error("Geçersiz veri formatı");
                 }
 
                 // İstatistikleri Ekrana Yazdır
@@ -148,14 +145,22 @@
                 }
                 
             } catch (error) {
-                console.error("Fetch işlemi sırasında hata:", error);
+                console.error("Bağlantı hatası detayı:", error);
                 const phaseEl = document.getElementById('stat-phase');
                 phaseEl.innerText = "Bağlantı Hatası!";
                 phaseEl.className = "text-xs font-bold text-red-400 mt-2"; 
                 
                 const fleetContainer = document.getElementById('fleet-container');
+                // Sadece liste boşsa veya yükleniyor diyorsa hata mesajını yazdır.
+                // Eğer daha önce veri geldiyse ekranda kalsın, silinmesin.
                 if (fleetContainer.innerHTML.includes('Sunucuya bağlanılıyor') || fleetContainer.innerHTML.includes('Yenileniyor')) {
-                    fleetContainer.innerHTML = '<p class="text-xs text-red-400 italic">⚠️ Sunucuyla bağlantı kurulamadı. (Proxy hatası veya Sunucu yanıt vermiyor)</p>';
+                     fleetContainer.innerHTML = `
+                        <div class="p-3 border border-red-500/30 rounded-lg bg-red-500/10">
+                            <p class="text-xs text-red-400 font-bold mb-1">⚠️ Sunucuya ulaşılamıyor!</p>
+                            <p class="text-[10px] text-gray-400">1. Botun sunucuda çalıştığından (systemctl status zenith) emin olun.</p>
+                            <p class="text-[10px] text-gray-400">2. Proxy servisi anlık olarak yanıt vermiyor olabilir.</p>
+                        </div>
+                    `;
                 }
             }
         }
@@ -168,7 +173,8 @@
         }
 
         fetchLiveStats();
-        setInterval(fetchLiveStats, 10000);
+        // Sık istek atmak proxy'i engelleyebilir, süreyi 15 saniyeye çıkardık
+        setInterval(fetchLiveStats, 15000);
     </script>
 </body>
 </html>
