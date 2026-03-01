@@ -89,41 +89,51 @@
             let finalData = null;
             let isSuccess = false;
 
-            // YEDEKLİ PROXY HAVUZU (Biri çökerse anında diğerine geçer)
+            // GELİŞMİŞ PROXY HAVUZU
+            // Bazı proxyler JSON'ı direkt verirken, bazıları 'contents' içine saklar.
             const proxies = [
-                'https://api.codetabs.com/v1/proxy?quest=', 
-                'https://api.allorigins.win/raw?url=',
-                'https://corsproxy.io/?'
+                { url: 'https://api.allorigins.win/get?url=', type: 'contents' }, // En stabili, ama ayrıştırma gerektirir
+                { url: 'https://thingproxy.freeboard.io/fetch/', type: 'direct' }, // Yeni ve stabil
+                { url: 'https://api.codetabs.com/v1/proxy?quest=', type: 'direct' }
             ];
 
-            // Eğer tarayıcı zaten HTTP ise (güvenlik kısıtlaması yoksa) direkt bağlanmayı ilk sıraya al
+            // Eğer tarayıcı HTTP ise (Masaüstü Telegram vb.) proxy'siz doğrudan bağlanmayı ilk sıraya koy.
             if (window.location.protocol === 'http:') {
-                proxies.unshift(''); 
+                proxies.unshift({ url: '', type: 'direct' }); 
             }
 
             for (let proxy of proxies) {
                 try {
-                    const fetchUrl = proxy === '' ? targetUrl : proxy + encodeURIComponent(targetUrl);
+                    const fetchUrl = proxy.url === '' ? targetUrl : proxy.url + encodeURIComponent(targetUrl);
                     
                     const response = await fetch(fetchUrl, {
                         method: 'GET',
-                        cache: 'no-store', // Her zaman en güncel veriyi zorla
-                        signal: AbortSignal.timeout(5000) // 5 saniye içinde cevap vermezse bu proxy'i terk et
+                        cache: 'no-store',
+                        signal: AbortSignal.timeout(6000) // 6 saniye bekle
                     });
                     
                     if (response.ok) {
-                        const data = await response.json();
-                        // Gelen verinin botumuza ait doğru veri olduğunu teyit et
+                        let data;
+                        if (proxy.type === 'contents') {
+                            // AllOrigins veriyi text olarak contents içine gömer
+                            const rawData = await response.json();
+                            if (rawData && rawData.contents) {
+                                data = JSON.parse(rawData.contents);
+                            }
+                        } else {
+                            data = await response.json();
+                        }
+                        
+                        // Gelen verinin bozuk olup olmadığını (Gerçekten botumuzdan mı geldiğini) kontrol et
                         if (data && typeof data === 'object' && 'monitored_count' in data) {
                             finalData = data;
                             isSuccess = true;
-                            console.log("Bağlantı başarılı. Kullanılan Proxy:", proxy || "Direkt");
-                            break; // Veriyi aldık, diğer proxy'leri denemeye gerek yok!
+                            console.log("Bağlantı başarılı. Kullanılan Proxy:", proxy.url || "Direkt (Proxy Yok)");
+                            break; // Başarılıysa diğerlerini denemeyi bırak!
                         }
                     }
                 } catch (error) {
-                    console.warn(`[Proxy Atlandı] ${proxy || 'Direct'} yanıt vermedi.`);
-                    // Hata verse bile döngü devam edip bir sonrakini deneyecek
+                    console.warn(`[Proxy Atlandı] ${proxy.url || 'Direct'} yanıt vermedi veya veri bozuk.`);
                 }
             }
 
@@ -172,8 +182,9 @@
                 if (fleetContainer.innerHTML.includes('Güvenli tünel') || fleetContainer.innerHTML.includes('Yenileniyor')) {
                      fleetContainer.innerHTML = `
                         <div class="p-3 border border-red-500/30 rounded-lg bg-red-500/10">
-                            <p class="text-xs text-red-400 font-bold mb-1">⚠️ Sunucuya Köprü Kurulamadı!</p>
-                            <p class="text-[10px] text-gray-400">Tüm aracı proxy servisleri şu an meşgul veya botunuzun portu (8080) kapalı.</p>
+                            <p class="text-xs text-red-400 font-bold mb-1">⚠️ Sunucuya Ulaşılamıyor!</p>
+                            <p class="text-[10px] text-gray-400">1. DigitalOcean sunucunuzda botun kapalı olma ihtimali yüksektir.</p>
+                            <p class="text-[10px] text-gray-400">2. Lütfen sunucu terminalinden <b>systemctl status zenith.service</b> yazarak botun çalıştığından emin olun.</p>
                         </div>
                     `;
                 }
@@ -188,7 +199,7 @@
         }
 
         fetchLiveStats();
-        // Veri yenileme süresini 15 saniye tutarak proxy limitlerine takılmayı önlüyoruz
+        // Proxy sunucularını yormamak için yenileme süresi 15 saniyede tutuldu.
         setInterval(fetchLiveStats, 15000);
     </script>
 </body>
