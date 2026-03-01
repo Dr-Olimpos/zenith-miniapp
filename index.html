@@ -82,13 +82,14 @@
     <!-- Hızlı İşlem Araçları -->
     <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-700/50 pb-2">⚙️ Hızlı İşlemler</h2>
     <div class="grid grid-cols-2 gap-3">
-        <button onclick="Telegram.WebApp.sendData('🔍 Manuel Tarama')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
+        <!-- sendData yerine showAlert kullanıldı -->
+        <button onclick="Telegram.WebApp.showAlert('🚀 İşlemi başlatmak için Telegram menüsündeki butonları kullanın.')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
             <div class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mb-2">
                 <i class="fa-solid fa-radar"></i>
             </div>
             <span class="text-xs font-bold">Derin Tarama Başlat</span>
         </button>
-        <button onclick="Telegram.WebApp.sendData('📋 Filoyu Göster')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
+        <button onclick="Telegram.WebApp.showAlert('📋 Filonuzu görmek için Telegram menüsündeki butonları kullanın.')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
             <div class="w-10 h-10 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center mb-2">
                 <i class="fa-solid fa-list-check"></i>
             </div>
