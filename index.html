@@ -52,7 +52,7 @@
     <!-- Dinamik Filo Listesi -->
     <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-700/50 pb-2">📋 İzleme Filosu</h2>
     <div id="fleet-container" class="space-y-2 mb-6 max-h-80 overflow-y-auto pr-1">
-        <p class="text-xs text-gray-500 italic">Sunucuya bağlanılıyor, lütfen bekleyin...</p>
+        <p class="text-xs text-gray-500 italic">Güvenli tünel aranıyor, lütfen bekleyin...</p>
     </div>
 
     <!-- Hızlı İşlem Araçları -->
@@ -85,47 +85,65 @@
         tg.MainButton.onClick(function() { tg.close(); });
 
         async function fetchLiveStats() {
+            const targetUrl = 'http://165.232.68.11:8080/api/stats';
+            let finalData = null;
+            let isSuccess = false;
+
+            // YEDEKLİ PROXY HAVUZU (Biri çökerse anında diğerine geçer)
+            const proxies = [
+                'https://api.codetabs.com/v1/proxy?quest=', 
+                'https://api.allorigins.win/raw?url=',
+                'https://corsproxy.io/?'
+            ];
+
+            // Eğer tarayıcı zaten HTTP ise (güvenlik kısıtlaması yoksa) direkt bağlanmayı ilk sıraya al
+            if (window.location.protocol === 'http:') {
+                proxies.unshift(''); 
+            }
+
+            for (let proxy of proxies) {
+                try {
+                    const fetchUrl = proxy === '' ? targetUrl : proxy + encodeURIComponent(targetUrl);
+                    
+                    const response = await fetch(fetchUrl, {
+                        method: 'GET',
+                        cache: 'no-store', // Her zaman en güncel veriyi zorla
+                        signal: AbortSignal.timeout(5000) // 5 saniye içinde cevap vermezse bu proxy'i terk et
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Gelen verinin botumuza ait doğru veri olduğunu teyit et
+                        if (data && typeof data === 'object' && 'monitored_count' in data) {
+                            finalData = data;
+                            isSuccess = true;
+                            console.log("Bağlantı başarılı. Kullanılan Proxy:", proxy || "Direkt");
+                            break; // Veriyi aldık, diğer proxy'leri denemeye gerek yok!
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`[Proxy Atlandı] ${proxy || 'Direct'} yanıt vermedi.`);
+                    // Hata verse bile döngü devam edip bir sonrakini deneyecek
+                }
+            }
+
             try {
-                const targetUrl = 'http://165.232.68.11:8080/api/stats';
-                let fetchUrl = targetUrl;
-                
-                // HTTPS engeli için en güvenilir yöntem: corsproxy.io
-                if (window.location.protocol === 'https:') {
-                    fetchUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
-                }
-
-                const response = await fetch(fetchUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    },
-                    // İstek zaman aşımını kısa tutalım ki hata anında hızlı dönsün
-                    signal: AbortSignal.timeout(8000)
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP Error: ${response.status}`);
-                }
-                
-                const data = await response.json();
-
-                // Eğer proxy html dönerse (hata sayfası) json beklediğimiz için patlarız
-                if (data && typeof data !== 'object') {
-                   throw new Error("Geçersiz veri formatı");
+                if (!isSuccess || !finalData) {
+                    throw new Error("Tüm bağlantı köprüleri (proxyler) başarısız oldu.");
                 }
 
                 // İstatistikleri Ekrana Yazdır
-                document.getElementById('stat-monitored').innerHTML = (data.monitored_count || 0) + '<span class="text-xs font-normal text-gray-500 ml-1">Balina</span>';
+                document.getElementById('stat-monitored').innerHTML = (finalData.monitored_count || 0) + '<span class="text-xs font-normal text-gray-500 ml-1">Balina</span>';
                 
                 const phaseEl = document.getElementById('stat-phase');
-                phaseEl.innerText = data.status || "Veri Bekleniyor";
+                phaseEl.innerText = finalData.status || "Veri Bekleniyor";
                 phaseEl.className = "text-xs font-bold text-green-400 mt-2";
 
                 // Hesap Listesini Oluştur
                 const fleetContainer = document.getElementById('fleet-container');
-                if (data.accounts && data.accounts.length > 0) {
+                if (finalData.accounts && finalData.accounts.length > 0) {
                     fleetContainer.innerHTML = '';
-                    data.accounts.forEach(acc => {
+                    finalData.accounts.forEach(acc => {
                         const div = document.createElement('div');
                         div.className = 'tg-card p-3 rounded-lg border border-gray-700/30 flex justify-between items-center';
                         div.innerHTML = `
@@ -145,20 +163,17 @@
                 }
                 
             } catch (error) {
-                console.error("Bağlantı hatası detayı:", error);
+                console.error("Nihai bağlantı hatası detayı:", error);
                 const phaseEl = document.getElementById('stat-phase');
-                phaseEl.innerText = "Bağlantı Hatası!";
+                phaseEl.innerText = "Tüneller Çöktü!";
                 phaseEl.className = "text-xs font-bold text-red-400 mt-2"; 
                 
                 const fleetContainer = document.getElementById('fleet-container');
-                // Sadece liste boşsa veya yükleniyor diyorsa hata mesajını yazdır.
-                // Eğer daha önce veri geldiyse ekranda kalsın, silinmesin.
-                if (fleetContainer.innerHTML.includes('Sunucuya bağlanılıyor') || fleetContainer.innerHTML.includes('Yenileniyor')) {
+                if (fleetContainer.innerHTML.includes('Güvenli tünel') || fleetContainer.innerHTML.includes('Yenileniyor')) {
                      fleetContainer.innerHTML = `
                         <div class="p-3 border border-red-500/30 rounded-lg bg-red-500/10">
-                            <p class="text-xs text-red-400 font-bold mb-1">⚠️ Sunucuya ulaşılamıyor!</p>
-                            <p class="text-[10px] text-gray-400">1. Botun sunucuda çalıştığından (systemctl status zenith) emin olun.</p>
-                            <p class="text-[10px] text-gray-400">2. Proxy servisi anlık olarak yanıt vermiyor olabilir.</p>
+                            <p class="text-xs text-red-400 font-bold mb-1">⚠️ Sunucuya Köprü Kurulamadı!</p>
+                            <p class="text-[10px] text-gray-400">Tüm aracı proxy servisleri şu an meşgul veya botunuzun portu (8080) kapalı.</p>
                         </div>
                     `;
                 }
@@ -167,13 +182,13 @@
 
         function refreshData() {
             const phaseEl = document.getElementById('stat-phase');
-            phaseEl.innerText = "Güncelleniyor...";
-            phaseEl.className = "text-xs font-bold text-blue-400 mt-2";
+            phaseEl.innerText = "Güvenli Tünel Aranıyor...";
+            phaseEl.className = "text-[10px] font-bold text-blue-400 mt-2";
             fetchLiveStats();
         }
 
         fetchLiveStats();
-        // Sık istek atmak proxy'i engelleyebilir, süreyi 15 saniyeye çıkardık
+        // Veri yenileme süresini 15 saniye tutarak proxy limitlerine takılmayı önlüyoruz
         setInterval(fetchLiveStats, 15000);
     </script>
 </body>
