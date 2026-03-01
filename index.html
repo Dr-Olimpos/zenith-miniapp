@@ -86,36 +86,43 @@
 
         async function fetchLiveStats() {
             try {
-                // Sunucu adresi
-                let apiUrl = 'http://165.232.68.11:8080/api/stats';
-                
-                // Eğer sayfa HTTPS üzerinden çalışıyorsa (Vercel, Canvas vb.), tarayıcı HTTP isteğini engeller (Mixed Content).
-                // Bunu aşmak için daha stabil olan allorigins proxy servisini kullanıyoruz.
+                const targetUrl = 'http://165.232.68.11:8080/api/stats';
+                let fetchUrl = targetUrl;
+                let useProxy = false;
+
+                // HTTPS ortamındaysak proxy kullan
                 if (window.location.protocol === 'https:') {
-                    apiUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl);
+                    useProxy = true;
+                    // cors-anywhere genellikle daha güvenilirdir (kendi public instance'ını kullanır)
+                    // Ancak public instance'lar için geçici erişim gerekebilir.
+                    // Alternatif olarak 'https://api.allorigins.win/get?url=' kullanıyoruz, fakat JSON ayrıştırmasına dikkat ediyoruz.
+                    fetchUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(targetUrl);
                 }
 
-                // API'ye İstek At
-                const response = await fetch(apiUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
+                const response = await fetch(fetchUrl);
                 
-                // Eğer 500 gibi bir HTTP hatası gelirse JSON'a çevirmeye çalışmadan direkt hataya düşür
                 if (!response.ok) {
                     throw new Error(`HTTP Error: ${response.status}`);
                 }
                 
-                const data = await response.json();
-                
+                let data = await response.json();
+
+                // allorigins kullanıldığında asıl veri 'contents' içindedir (eğer /get kullanıldıysa)
+                if (useProxy && data.contents) {
+                    try {
+                        data = JSON.parse(data.contents);
+                    } catch (e) {
+                        console.error("Proxy yanıtı JSON formatında değil:", data.contents);
+                        throw new Error("Veri ayrıştırma hatası.");
+                    }
+                }
+
                 // İstatistikleri Ekrana Yazdır
                 document.getElementById('stat-monitored').innerHTML = (data.monitored_count || 0) + '<span class="text-xs font-normal text-gray-500 ml-1">Balina</span>';
                 
                 const phaseEl = document.getElementById('stat-phase');
                 phaseEl.innerText = data.status || "Veri Bekleniyor";
-                phaseEl.className = "text-xs font-bold text-green-400 mt-2"; // Başarılıysa yeşil yap
+                phaseEl.className = "text-xs font-bold text-green-400 mt-2";
 
                 // Hesap Listesini Oluştur
                 const fleetContainer = document.getElementById('fleet-container');
@@ -144,17 +151,15 @@
                 console.error("Fetch işlemi sırasında hata:", error);
                 const phaseEl = document.getElementById('stat-phase');
                 phaseEl.innerText = "Bağlantı Hatası!";
-                phaseEl.className = "text-xs font-bold text-red-400 mt-2"; // Hata varsa kırmızı yap
+                phaseEl.className = "text-xs font-bold text-red-400 mt-2"; 
                 
-                // Sadece liste boşsa hata uyarısı ver, eski liste varsa ekranda tut
                 const fleetContainer = document.getElementById('fleet-container');
                 if (fleetContainer.innerHTML.includes('Sunucuya bağlanılıyor') || fleetContainer.innerHTML.includes('Yenileniyor')) {
-                    fleetContainer.innerHTML = '<p class="text-xs text-red-400 italic">⚠️ Sunucuyla bağlantı kurulamadı. (Tarayıcı HTTPS engeli veya Bot kapalı olabilir)</p>';
+                    fleetContainer.innerHTML = '<p class="text-xs text-red-400 italic">⚠️ Sunucuyla bağlantı kurulamadı. (Proxy hatası veya Sunucu yanıt vermiyor)</p>';
                 }
             }
         }
 
-        // Yenile butonuna basıldığında
         function refreshData() {
             const phaseEl = document.getElementById('stat-phase');
             phaseEl.innerText = "Güncelleniyor...";
@@ -162,7 +167,6 @@
             fetchLiveStats();
         }
 
-        // Sayfa açıldığında çek ve her 10 saniyede bir otomatik yenile
         fetchLiveStats();
         setInterval(fetchLiveStats, 10000);
     </script>
