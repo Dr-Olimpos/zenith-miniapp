@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zenith Alpha Dashboard</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Telegram WebApp JS -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- İkonlar -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
@@ -36,73 +33,49 @@
         <div id="user-profile" class="text-sm font-medium opacity-80"></div>
     </div>
 
-    <!-- İstatistik Kartları (CANLI VERİ BURAYA GELECEK) -->
+    <!-- İstatistik Kartları -->
     <div class="grid grid-cols-2 gap-4 mb-6">
         <div class="tg-card rounded-xl p-4 shadow-sm border border-gray-700/50">
             <div class="flex items-center text-gray-400 mb-1 text-xs uppercase font-bold tracking-wider">
                 <i class="fa-solid fa-users mr-2"></i> İzlenen Ağ
             </div>
-            <!-- ID eklendi -->
             <div id="stat-monitored" class="text-2xl font-bold">--<span class="text-xs font-normal text-gray-500 ml-1">Hesap</span></div>
         </div>
         <div class="tg-card rounded-xl p-4 shadow-sm border border-gray-700/50">
             <div class="flex items-center text-green-400 mb-1 text-xs uppercase font-bold tracking-wider">
                 <i class="fa-solid fa-bolt mr-2"></i> Canlı Faz
             </div>
-            <!-- ID eklendi -->
             <div id="stat-phase" class="text-xs font-bold text-blue-400 mt-2">Bağlanıyor...</div>
         </div>
     </div>
 
-    <!-- Son Kesişim Alarmları (Clusters) -->
-    <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-700/50 pb-2">🚨 Kesişim (Cluster) Tespiti</h2>
-    <div class="space-y-3 mb-6">
-        <div class="tg-card rounded-xl p-4 relative overflow-hidden">
-            <div class="absolute -right-4 -top-4 w-16 h-16 bg-red-500/20 rounded-full blur-xl"></div>
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <h3 class="font-bold text-lg">@AgentPro_AI</h3>
-                    <div class="text-xs text-gray-400">Sektör: AI / DePIN</div>
-                </div>
-                <span class="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded font-bold border border-red-500/30">HOT</span>
-            </div>
-            <div class="mt-3 text-sm">
-                <p class="text-gray-300 mb-1">Ortak Takipler:</p>
-                <div class="flex flex-wrap gap-1">
-                    <span class="bg-gray-700 text-gray-200 px-2 py-0.5 rounded text-xs">@blknoiz06</span>
-                    <span class="bg-gray-700 text-gray-200 px-2 py-0.5 rounded text-xs">@MustStopMurad</span>
-                </div>
-            </div>
-            <button onclick="Telegram.WebApp.showAlert('Cüzdan kontratı arattırılıyor...')" class="tg-button mt-4 w-full py-2 rounded-lg font-bold text-sm transition transform active:scale-95 shadow-md shadow-blue-500/20">
-                <i class="fa-solid fa-magnifying-glass-chart mr-1"></i> Kontrat Analizi Yap
-            </button>
-        </div>
+    <!-- Dinamik Filo Listesi -->
+    <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-700/50 pb-2">📋 İzleme Filosu</h2>
+    <div id="fleet-container" class="space-y-2 mb-6 max-h-80 overflow-y-auto pr-1">
+        <p class="text-xs text-gray-500 italic">Sunucuya bağlanılıyor, lütfen bekleyin...</p>
     </div>
 
     <!-- Hızlı İşlem Araçları -->
     <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-700/50 pb-2">⚙️ Hızlı İşlemler</h2>
     <div class="grid grid-cols-2 gap-3">
-        <!-- sendData yerine showAlert kullanıldı -->
-        <button onclick="Telegram.WebApp.showAlert('🚀 İşlemi başlatmak için Telegram menüsündeki butonları kullanın.')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
+        <button onclick="Telegram.WebApp.showAlert('🚀 Manuel tarama başlatmak için Telegram bot menüsündeki butonları kullanın.')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
             <div class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mb-2">
                 <i class="fa-solid fa-radar"></i>
             </div>
-            <span class="text-xs font-bold">Derin Tarama Başlat</span>
+            <span class="text-xs font-bold">Manuel Tara</span>
         </button>
-        <button onclick="Telegram.WebApp.showAlert('📋 Filonuzu görmek için Telegram menüsündeki butonları kullanın.')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
-            <div class="w-10 h-10 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center mb-2">
-                <i class="fa-solid fa-list-check"></i>
+        <button onclick="refreshData()" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
+            <div class="w-10 h-10 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center mb-2">
+                <i class="fa-solid fa-rotate"></i>
             </div>
-            <span class="text-xs font-bold">Filoyu Göster</span>
+            <span class="text-xs font-bold">Listeyi Yenile</span>
         </button>
     </div>
 
     <script>
-        // 1. Telegram API Başlatma
         const tg = window.Telegram.WebApp;
         tg.expand(); 
         
-        // Kullanıcı adını al
         if(tg.initDataUnsafe && tg.initDataUnsafe.user) {
             document.getElementById('user-profile').innerText = "@" + tg.initDataUnsafe.user.username;
         }
@@ -111,28 +84,87 @@
         tg.MainButton.show();
         tg.MainButton.onClick(function() { tg.close(); });
 
-        // ==========================================
-        // 2. SUNUCUYA BAĞLANIP CANLI VERİ ÇEKME KISMI
-        // ==========================================
         async function fetchLiveStats() {
             try {
-                // IP Adresin buraya eklendi!
-                const response = await fetch('http://165.232.68.11:8080/api/stats');
+                // Sunucu adresi
+                let apiUrl = 'http://165.232.68.11:8080/api/stats';
+                
+                // Eğer sayfa HTTPS üzerinden çalışıyorsa (Vercel, Canvas vb.), tarayıcı HTTP isteğini engeller (Mixed Content).
+                // Bunu aşmak için daha stabil olan allorigins proxy servisini kullanıyoruz.
+                if (window.location.protocol === 'https:') {
+                    apiUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl);
+                }
+
+                // API'ye İstek At
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                // Eğer 500 gibi bir HTTP hatası gelirse JSON'a çevirmeye çalışmadan direkt hataya düşür
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
-                // Gelen verileri HTML'e yazdırıyoruz
-                document.getElementById('stat-monitored').innerHTML = data.monitored_count + '<span class="text-xs font-normal text-gray-500 ml-1">Balina</span>';
-                document.getElementById('stat-phase').innerText = data.status;
+                // İstatistikleri Ekrana Yazdır
+                document.getElementById('stat-monitored').innerHTML = (data.monitored_count || 0) + '<span class="text-xs font-normal text-gray-500 ml-1">Balina</span>';
+                
+                const phaseEl = document.getElementById('stat-phase');
+                phaseEl.innerText = data.status || "Veri Bekleniyor";
+                phaseEl.className = "text-xs font-bold text-green-400 mt-2"; // Başarılıysa yeşil yap
+
+                // Hesap Listesini Oluştur
+                const fleetContainer = document.getElementById('fleet-container');
+                if (data.accounts && data.accounts.length > 0) {
+                    fleetContainer.innerHTML = '';
+                    data.accounts.forEach(acc => {
+                        const div = document.createElement('div');
+                        div.className = 'tg-card p-3 rounded-lg border border-gray-700/30 flex justify-between items-center';
+                        div.innerHTML = `
+                            <div>
+                                <span class="text-sm font-bold">@${acc.username || 'Bilinmiyor'}</span>
+                                <div class="text-[10px] text-gray-500">${acc.cat_emoji || '🌐'} ${acc.cat_name || 'Genel'}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs font-mono text-blue-400">${acc.following || 0}</div>
+                                <div class="text-[8px] uppercase text-gray-600 tracking-tighter">Takip</div>
+                            </div>
+                        `;
+                        fleetContainer.appendChild(div);
+                    });
+                } else {
+                    fleetContainer.innerHTML = '<p class="text-xs text-gray-500 italic">Henüz hesap eklenmemiş veya veritabanı boş.</p>';
+                }
                 
             } catch (error) {
-                document.getElementById('stat-phase').innerText = "Bağlantı Hatası!";
-                document.getElementById('stat-phase').classList.add("text-red-400");
+                console.error("Fetch işlemi sırasında hata:", error);
+                const phaseEl = document.getElementById('stat-phase');
+                phaseEl.innerText = "Bağlantı Hatası!";
+                phaseEl.className = "text-xs font-bold text-red-400 mt-2"; // Hata varsa kırmızı yap
+                
+                // Sadece liste boşsa hata uyarısı ver, eski liste varsa ekranda tut
+                const fleetContainer = document.getElementById('fleet-container');
+                if (fleetContainer.innerHTML.includes('Sunucuya bağlanılıyor') || fleetContainer.innerHTML.includes('Yenileniyor')) {
+                    fleetContainer.innerHTML = '<p class="text-xs text-red-400 italic">⚠️ Sunucuyla bağlantı kurulamadı. (Tarayıcı HTTPS engeli veya Bot kapalı olabilir)</p>';
+                }
             }
         }
 
-        // Sayfa açıldığında veriyi çek ve her 5 saniyede bir güncelle
+        // Yenile butonuna basıldığında
+        function refreshData() {
+            const phaseEl = document.getElementById('stat-phase');
+            phaseEl.innerText = "Güncelleniyor...";
+            phaseEl.className = "text-xs font-bold text-blue-400 mt-2";
+            fetchLiveStats();
+        }
+
+        // Sayfa açıldığında çek ve her 10 saniyede bir otomatik yenile
         fetchLiveStats();
-        setInterval(fetchLiveStats, 5000);
+        setInterval(fetchLiveStats, 10000);
     </script>
 </body>
 </html>
