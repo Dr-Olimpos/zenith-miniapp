@@ -16,10 +16,6 @@
         .tg-card {
             background-color: var(--tg-theme-secondary-bg-color, #1f2937);
         }
-        .tg-button {
-            background-color: var(--tg-theme-button-color, #3b82f6);
-            color: var(--tg-theme-button-text-color, #ffffff);
-        }
         .accordion-content {
             transition: max-height 0.3s ease-out, opacity 0.3s ease;
             max-height: 0;
@@ -27,62 +23,68 @@
             overflow: hidden;
         }
         .accordion-content.open {
-            max-height: 500px; /* İçeriğe göre genişler */
+            max-height: 800px;
             opacity: 1;
             overflow-y: auto;
         }
+        /* Özel Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
     </style>
 </head>
 <body class="p-4 antialiased">
 
     <!-- Üst Başlık -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-4">
         <div class="flex items-center space-x-2">
             <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/50">Z</div>
             <h1 class="text-xl font-bold tracking-wider">ZENITH <span class="text-blue-400">APEX</span></h1>
         </div>
-        <div id="user-profile" class="text-sm font-medium opacity-80"></div>
+        <div id="stat-phase" class="text-[10px] font-bold text-blue-400 px-2 py-1 bg-blue-500/10 rounded-full border border-blue-500/20 truncate max-w-[120px]">Bağlanıyor...</div>
     </div>
 
-    <!-- İstatistik Kartları -->
-    <div class="grid grid-cols-2 gap-4 mb-6">
-        <div class="tg-card rounded-xl p-4 shadow-sm border border-gray-700/50">
-            <div class="flex items-center text-gray-400 mb-1 text-xs uppercase font-bold tracking-wider">
-                <i class="fa-solid fa-users mr-2"></i> İzlenen Ağ
+    <!-- Airtable Tarzı Filtreleme Paneli -->
+    <div class="tg-card rounded-xl p-3 mb-4 shadow-sm border border-gray-700/50">
+        <div class="flex gap-2">
+            <!-- Arama Kutusu -->
+            <div class="relative flex-1">
+                <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs"></i>
+                <input type="text" id="searchInput" placeholder="Hesap ara..." class="w-full bg-gray-800/50 border border-gray-700 rounded-lg py-2 pl-8 pr-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
             </div>
-            <div id="stat-monitored" class="text-2xl font-bold">--<span class="text-xs font-normal text-gray-500 ml-1">Hesap</span></div>
-        </div>
-        <div class="tg-card rounded-xl p-4 shadow-sm border border-gray-700/50">
-            <div class="flex items-center text-green-400 mb-1 text-xs uppercase font-bold tracking-wider">
-                <i class="fa-solid fa-bolt mr-2"></i> Canlı Faz
-            </div>
-            <div id="stat-phase" class="text-[10px] font-bold text-blue-400 mt-2 truncate">Bağlanıyor...</div>
+            <!-- Kategori Seçici -->
+            <select id="categoryFilter" class="bg-gray-800/50 border border-gray-700 rounded-lg py-2 px-2 text-xs text-white focus:outline-none focus:border-blue-500 transition min-w-[100px]">
+                <option value="ALL">Tüm Sektörler</option>
+                <!-- Kategoriler JS ile dolacak -->
+            </select>
         </div>
     </div>
 
-    <!-- Dinamik ve Kategorize Edilmiş Filo Listesi -->
-    <div class="flex justify-between items-center mb-3 border-b border-gray-700/50 pb-2">
-        <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400">📋 İstihbarat Ağı</h2>
-        <button onclick="refreshData()" class="text-xs text-blue-400 flex items-center"><i class="fa-solid fa-rotate mr-1"></i> Yenile</button>
+    <!-- İstatistik ve Araç Çubuğu -->
+    <div class="flex justify-between items-center mb-3 px-1">
+        <div class="text-xs text-gray-400">
+            <span class="font-bold text-white" id="visibleCount">0</span> Hesap Gösteriliyor
+        </div>
+        <button onclick="refreshData()" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded-full border border-gray-700 transition flex items-center">
+            <i class="fa-solid fa-rotate mr-1"></i> Yenile
+        </button>
     </div>
     
-    <div id="fleet-container" class="space-y-4 mb-6 pb-10">
-        <p class="text-xs text-gray-500 italic">Güvenli tünel aranıyor, lütfen bekleyin...</p>
+    <!-- Dinamik Liste (Tablo Arayüzü) -->
+    <div id="fleet-container" class="space-y-3 pb-10">
+        <p class="text-xs text-gray-500 italic text-center py-10">Güvenli tünel aranıyor, lütfen bekleyin...</p>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand(); 
         
-        if(tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            document.getElementById('user-profile').innerText = "@" + tg.initDataUnsafe.user.username;
-        }
-
         tg.MainButton.setText('DASHBOARD KAPAT');
         tg.MainButton.show();
         tg.MainButton.onClick(function() { tg.close(); });
 
-        // Akordeon aç/kapat fonksiyonu
+        let globalAccounts = []; // Arama ve filtreleme için veriyi hafızada tutarız
+
         window.toggleHistory = function(id) {
             const content = document.getElementById(id);
             const icon = document.getElementById('icon-' + id);
@@ -96,17 +98,24 @@
             }
         }
 
+        // Trojan/Maestro gibi botlara Telegram içinden yönlendirme yapar
+        window.tradeSniper = function(username) {
+            const botUrl = `https://t.me/solana_trojanbot?start=r-${username}`;
+            tg.openTelegramLink(botUrl);
+        }
+
         async function fetchLiveStats() {
             const targetUrl = 'http://165.232.68.11:8080/api/stats';
             let finalData = null;
             let isSuccess = false;
 
-            // GELİŞMİŞ PROXY HAVUZU (Bağlantı kopmasını engeller)
+            // ZENGİNLEŞTİRİLMİŞ PROXY HAVUZU (Ekstra proxy eklendi)
             const proxies = [
-                { url: 'https://api.allorigins.win/get?url=', type: 'contents' }, 
-                { url: 'https://thingproxy.freeboard.io/fetch/', type: 'direct' },
+                { url: 'https://corsproxy.io/?', type: 'direct'},
+                { url: 'https://api.allorigins.win/raw?url=', type: 'direct' },
                 { url: 'https://api.codetabs.com/v1/proxy?quest=', type: 'direct' },
-                { url: 'https://corsproxy.io/?', type: 'direct'}
+                { url: 'https://thingproxy.freeboard.io/fetch/', type: 'direct' }, // Ekstra proxy
+                { url: 'https://api.allorigins.win/get?url=', type: 'contents' } // Güçlü fallback proxy
             ];
 
             if (window.location.protocol === 'http:') {
@@ -116,24 +125,14 @@
             for (let proxy of proxies) {
                 try {
                     const fetchUrl = proxy.url === '' ? targetUrl : proxy.url + encodeURIComponent(targetUrl);
-                    
                     const response = await fetch(fetchUrl, {
                         method: 'GET',
                         cache: 'no-store',
-                        signal: AbortSignal.timeout(6000) 
+                        signal: AbortSignal.timeout(25000) // Zaman aşımı 25 saniyeye (25000ms) çıkarıldı!
                     });
                     
                     if (response.ok) {
-                        let data;
-                        if (proxy.type === 'contents') {
-                            const rawData = await response.json();
-                            if (rawData && rawData.contents) {
-                                data = JSON.parse(rawData.contents);
-                            }
-                        } else {
-                            data = await response.json();
-                        }
-                        
+                        let data = proxy.type === 'contents' ? JSON.parse((await response.json()).contents) : await response.json();
                         if (data && typeof data === 'object' && 'monitored_count' in data) {
                             finalData = data;
                             isSuccess = true;
@@ -142,117 +141,136 @@
                         }
                     }
                 } catch (error) {
-                    console.warn(`[Proxy Atlandı] ${proxy.url || 'Direct'} yanıt vermedi.`);
+                    console.warn(`[Proxy Atlandı] ${proxy.url || 'Direct'} yanıt vermedi:`, error.message);
                 }
             }
 
-            try {
-                if (!isSuccess || !finalData) {
-                    throw new Error("Tüm bağlantı köprüleri (proxyler) başarısız oldu.");
-                }
-
-                // İstatistikleri Ekrana Yazdır
-                document.getElementById('stat-monitored').innerHTML = (finalData.monitored_count || 0) + '<span class="text-xs font-normal text-gray-500 ml-1">Balina</span>';
+            if (isSuccess && finalData) {
+                document.getElementById('stat-phase').innerText = "Canlı Akış Aktif";
+                document.getElementById('stat-phase').className = "text-[10px] font-bold text-green-400 px-2 py-1 bg-green-500/10 rounded-full border border-green-500/20 truncate max-w-[120px]";
                 
-                const phaseEl = document.getElementById('stat-phase');
-                phaseEl.innerText = finalData.status || "Veri Bekleniyor";
-                phaseEl.className = "text-[10px] font-bold text-green-400 mt-2 truncate";
-
-                // Verileri Kategoriye Göre Grupla
-                const groupedAccounts = {};
-                if (finalData.accounts && finalData.accounts.length > 0) {
-                    finalData.accounts.forEach(acc => {
-                        const catKey = `${acc.cat_emoji || '🌐'} ${acc.cat_name || 'Genel'}`;
-                        if (!groupedAccounts[catKey]) groupedAccounts[catKey] = [];
-                        groupedAccounts[catKey].push(acc);
-                    });
-
-                    const fleetContainer = document.getElementById('fleet-container');
-                    fleetContainer.innerHTML = '';
-                    
-                    let globalIndex = 0;
-
-                    // Grupları Ekrana Çiz
-                    for (const [category, accounts] of Object.entries(groupedAccounts)) {
-                        const catHeader = document.createElement('div');
-                        catHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4 ml-1';
-                        catHeader.innerText = category;
-                        fleetContainer.appendChild(catHeader);
-
-                        accounts.forEach(acc => {
-                            const histId = `hist-${globalIndex}`;
-                            globalIndex++;
-
-                            // Tarihçeyi HTML'e çevir
-                            let historyHtml = '<div class="p-3 bg-[#17202e] text-xs text-gray-500 italic rounded-b-lg">Son 7 günde yeni takip yok.</div>';
-                            
-                            if (acc.history && acc.history.length > 0) {
-                                const links = acc.history.map(h => 
-                                    `<a href="https://x.com/${h.nick}" target="_blank" class="flex justify-between items-center p-2 mb-1 bg-gray-800 hover:bg-gray-700 rounded transition">
-                                        <span class="text-blue-400 font-medium"><i class="fa-brands fa-twitter mr-1"></i> @${h.nick}</span>
-                                        <span class="text-[10px] text-gray-500">${h.added_at}</span>
-                                    </a>`
-                                ).join('');
-                                
-                                historyHtml = `<div class="p-2 bg-[#17202e] rounded-b-lg border-t border-gray-700/50">${links}</div>`;
-                            }
-
-                            const div = document.createElement('div');
-                            div.className = 'tg-card rounded-lg border border-gray-700/30 mb-2 shadow-sm';
-                            
-                            div.innerHTML = `
-                                <!-- Tıklanabilir Üst Kısım -->
-                                <div class="p-3 flex justify-between items-center cursor-pointer active:bg-gray-700 transition rounded-lg" onclick="toggleHistory('${histId}')">
-                                    <div>
-                                        <span class="text-sm font-bold">@${acc.username || 'Bilinmiyor'}</span>
-                                        <div class="text-[10px] text-gray-400 mt-0.5">Takipler: ${acc.following || 0}</div>
-                                    </div>
-                                    <div class="flex items-center text-gray-500">
-                                        <span class="text-[10px] mr-2 bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">${acc.history ? acc.history.length : 0} Yeni</span>
-                                        <i id="icon-${histId}" class="fa-solid fa-chevron-down transition-transform duration-300"></i>
-                                    </div>
-                                </div>
-                                <!-- Açılır/Kapanır Geçmiş İçeriği -->
-                                <div id="${histId}" class="accordion-content">
-                                    ${historyHtml}
-                                </div>
-                            `;
-                            fleetContainer.appendChild(div);
-                        });
-                    }
-                } else {
-                    document.getElementById('fleet-container').innerHTML = '<p class="text-xs text-gray-500 italic">Henüz hesap eklenmemiş veya veritabanı boş.</p>';
-                }
+                globalAccounts = finalData.accounts || [];
+                updateCategoryDropdown();
+                renderList(); // Arayüzü çiz
+            } else {
+                document.getElementById('stat-phase').innerText = "Bağlantı Hatası!";
+                document.getElementById('stat-phase').className = "text-[10px] font-bold text-red-400 px-2 py-1 bg-red-500/10 rounded-full border border-red-500/20 truncate max-w-[120px]";
                 
-            } catch (error) {
-                console.error("Nihai bağlantı hatası detayı:", error);
-                const phaseEl = document.getElementById('stat-phase');
-                phaseEl.innerText = "Tüneller Çöktü!";
-                phaseEl.className = "text-[10px] font-bold text-red-400 mt-2 truncate"; 
-                
-                const fleetContainer = document.getElementById('fleet-container');
-                if (fleetContainer.innerHTML.includes('Güvenli tünel') || fleetContainer.innerHTML.includes('Yenileniyor')) {
-                     fleetContainer.innerHTML = `
-                        <div class="p-3 border border-red-500/30 rounded-lg bg-red-500/10">
+                const container = document.getElementById('fleet-container');
+                if (container.innerHTML.includes('Güvenli tünel') || container.innerHTML.includes('Yenileniyor')) {
+                     container.innerHTML = `
+                        <div class="p-3 border border-red-500/30 rounded-lg bg-red-500/10 text-center">
                             <p class="text-xs text-red-400 font-bold mb-1">⚠️ Sunucuya Ulaşılamıyor!</p>
-                            <p class="text-[10px] text-gray-400">1. DigitalOcean sunucunuzda botun kapalı olma ihtimali yüksektir.</p>
-                            <p class="text-[10px] text-gray-400">2. Lütfen sunucu terminalinden <b>systemctl status zenith.service</b> yazarak botun çalıştığından emin olun.</p>
+                            <p class="text-[10px] text-gray-400">Proxy tünellerinin hepsi zaman aşımına uğradı. Sunucunuzun (165.232.68.11:8080) çalıştığını kontrol edin.</p>
                         </div>
                     `;
                 }
             }
         }
 
+        function updateCategoryDropdown() {
+            const select = document.getElementById('categoryFilter');
+            const currentVal = select.value;
+            
+            // Tüm benzersiz kategorileri bul
+            const categories = [...new Set(globalAccounts.map(a => `${a.cat_emoji || '🌐'} ${a.cat_name || 'Genel'}`))];
+            
+            let html = '<option value="ALL">Tüm Kategoriler</option>';
+            categories.sort().forEach(cat => {
+                html += `<option value="${cat}">${cat}</option>`;
+            });
+            
+            select.innerHTML = html;
+            select.value = categories.includes(currentVal) ? currentVal : "ALL";
+        }
+
+        function renderList() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const container = document.getElementById('fleet-container');
+            
+            // Filtreleme Mantığı
+            const filtered = globalAccounts.filter(acc => {
+                const matchSearch = acc.username.toLowerCase().includes(searchTerm);
+                const accCat = `${acc.cat_emoji || '🌐'} ${acc.cat_name || 'Genel'}`;
+                const matchCat = categoryFilter === "ALL" || accCat === categoryFilter;
+                return matchSearch && matchCat;
+            });
+
+            document.getElementById('visibleCount').innerText = filtered.length;
+            container.innerHTML = '';
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-500 text-xs">Aradığınız kriterde sonuç bulunamadı.</div>';
+                return;
+            }
+
+            // Gelişmiş Tablo Kartları Çizimi
+            filtered.forEach((acc, index) => {
+                const histId = `hist-${index}`;
+                
+                // History İşlemleri & Trade Butonları
+                let historyHtml = '<div class="p-3 bg-[#17202e] text-xs text-gray-500 italic rounded-b-lg">Son 7 günde yeni takip yok.</div>';
+                if (acc.history && acc.history.length > 0) {
+                    const links = acc.history.map(h => `
+                        <div class="flex justify-between items-center p-2 mb-1 bg-gray-800/80 hover:bg-gray-700/80 rounded border border-gray-700/50 transition">
+                            <a href="https://x.com/${h.nick}" target="_blank" class="flex-1 text-blue-400 font-medium flex items-center">
+                                <i class="fa-brands fa-twitter mr-2"></i> @${h.nick}
+                            </a>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-[9px] text-gray-500">${h.added_at}</span>
+                                <!-- TRADE BUTONU (Telegram Mini App İçi Sniper) -->
+                                <button onclick="tradeSniper('${h.nick}')" class="bg-green-500/20 hover:bg-green-500/40 text-green-400 border border-green-500/30 px-2 py-1 rounded shadow-sm transition active:scale-95 flex items-center">
+                                    <i class="fa-solid fa-crosshairs mr-1"></i> Trade
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                    historyHtml = `<div class="p-2 bg-[#17202e] rounded-b-lg border-t border-gray-700/50">${links}</div>`;
+                }
+
+                const div = document.createElement('div');
+                div.className = 'tg-card rounded-lg border border-gray-700/30 shadow-sm';
+                
+                div.innerHTML = `
+                    <div class="p-3 flex justify-between items-center cursor-pointer active:bg-gray-700 transition rounded-lg" onclick="toggleHistory('${histId}')">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-bold">@${acc.username || 'Bilinmiyor'}</span>
+                                <span class="text-[9px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700">${acc.cat_emoji} ${acc.cat_name}</span>
+                            </div>
+                            <!-- X ve DB Sayıları Senkronizasyonu -->
+                            <div class="text-[10px] text-gray-400 mt-1 flex space-x-3">
+                                <span><i class="fa-brands fa-x-twitter text-gray-500"></i> X: <b class="text-gray-300">${acc.x_count}</b></span>
+                                <span><i class="fa-solid fa-database text-gray-500"></i> DB: <b class="text-gray-300">${acc.db_count}</b></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center text-gray-500">
+                            <span class="text-[10px] mr-2 ${acc.history?.length > 0 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-gray-800 text-gray-500 border-gray-700'} border px-2 py-0.5 rounded font-bold">${acc.history ? acc.history.length : 0} Yeni</span>
+                            <i id="icon-${histId}" class="fa-solid fa-chevron-down transition-transform duration-300"></i>
+                        </div>
+                    </div>
+                    <div id="${histId}" class="accordion-content">
+                        ${historyHtml}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Filtre Dinleyicileri
+        document.getElementById('searchInput').addEventListener('input', renderList);
+        document.getElementById('categoryFilter').addEventListener('change', renderList);
+
         function refreshData() {
-            const phaseEl = document.getElementById('stat-phase');
-            phaseEl.innerText = "Güvenli Tünel Aranıyor...";
-            phaseEl.className = "text-[10px] font-bold text-blue-400 mt-2 truncate";
+            document.getElementById('stat-phase').innerText = "Yenileniyor...";
+            document.getElementById('stat-phase').className = "text-[10px] font-bold text-yellow-500 px-2 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20 truncate max-w-[120px]";
             fetchLiveStats();
         }
 
+        // Başlat ve döngüye al
         fetchLiveStats();
-        // 15 Saniyede bir otomatik yeniler
-        setInterval(fetchLiveStats, 15000);
+        setInterval(fetchLiveStats, 30000); // Yenileme süresi proxy limitine takılmamak için 30 saniyeye uzatıldı
     </script>
 </body>
 </html>
