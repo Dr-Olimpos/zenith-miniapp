@@ -27,7 +27,8 @@
             <h1 class="text-xl font-bold tracking-wider text-inherit">ZENITH <span class="text-blue-500">APEX</span></h1>
         </div>
         <div class="flex items-center space-x-3">
-            <div id="stat-phase" class="text-[10px] font-bold text-blue-500 px-2 py-1 bg-blue-500/10 rounded-full border border-blue-500/20 truncate max-w-[100px]">Bağlanıyor...</div>
+            <!-- DÜZELTME: Durum butonu tıklanabilir (cursor-pointer) yapıldı ve onclick olayı eklendi -->
+            <div id="stat-phase" onclick="showStatusDetails()" class="text-[10px] font-bold text-blue-500 px-2 py-1 bg-blue-500/10 rounded-full border border-blue-500/20 truncate max-w-[100px] cursor-pointer hover:bg-blue-500/20 transition">Bağlanıyor...</div>
             <!-- Gece/Gündüz Modu Butonu -->
             <button onclick="toggleTheme()" class="w-8 h-8 rounded-full bg-gray-800 text-yellow-400 border border-gray-700 flex items-center justify-center transition active:scale-90" id="themeBtn">
                 <i class="fa-solid fa-moon"></i>
@@ -79,6 +80,22 @@
         let globalAccounts = [];
         let currentTab = 'ALL'; // ALL veya FAV
         let isDarkMode = true;
+
+        // DÜZELTME: Sistem Durumu Butonuna Tıklanınca Açıklama Veren Fonksiyon
+        window.showStatusDetails = function() {
+            const phaseText = document.getElementById('stat-phase').innerText;
+            let explanation = "";
+            
+            if(phaseText.includes("Canlı")) {
+                explanation = "Sistem Kusursuz Çalışıyor 🟢\n\nSunucu ile veri tüneli aktif. Python botunuz X (Twitter) API'sine bağlı ve verileri anlık olarak çekmeye devam ediyor.";
+            } else if (phaseText.includes("Yenileniyor")) {
+                explanation = "Veriler İsteniyor ⏳\n\nSunucudan en güncel veriler çekiliyor, lütfen bekleyin.";
+            } else {
+                explanation = "Bağlantı Sorunu 🔴\n\nProxy tünelleri yanıt vermiyor veya sunucunuzdaki Zenith botu kapanmış olabilir. Lütfen DigitalOcean terminalinizden botun durumunu kontrol edin.";
+            }
+            
+            tg.showAlert("📋 SİSTEM DURUMU:\n" + phaseText + "\n\n" + explanation);
+        }
 
         // Gece Gündüz Modu
         function toggleTheme() {
@@ -186,13 +203,13 @@
 
             if (isSuccess && finalData) {
                 document.getElementById('stat-phase').innerText = finalData.status || "Canlı Akış";
-                document.getElementById('stat-phase').className = "text-[10px] font-bold text-green-500 px-2 py-1 bg-green-500/10 rounded-full border border-green-500/20 truncate max-w-[100px]";
+                document.getElementById('stat-phase').className = "text-[10px] font-bold text-green-500 px-2 py-1 bg-green-500/10 rounded-full border border-green-500/20 truncate max-w-[100px] cursor-pointer hover:bg-green-500/20 transition";
                 globalAccounts = finalData.accounts || [];
                 updateCategoryDropdown();
                 renderList(); 
             } else {
-                document.getElementById('stat-phase').innerText = "Hata!";
-                document.getElementById('stat-phase').className = "text-[10px] font-bold text-red-500 px-2 py-1 bg-red-500/10 rounded-full border border-red-500/20 truncate max-w-[100px]";
+                document.getElementById('stat-phase').innerText = "Bağlantı Hatası!";
+                document.getElementById('stat-phase').className = "text-[10px] font-bold text-red-500 px-2 py-1 bg-red-500/10 rounded-full border border-red-500/20 truncate max-w-[100px] cursor-pointer hover:bg-red-500/20 transition";
             }
         }
 
@@ -285,6 +302,10 @@
                         historyHtml = `<div class="p-2 ${historyBg} rounded-b-lg border-t">${links}</div>`;
                     }
 
+                    // DÜZELTME: undefined hatasını önlemek için güvenli değer ataması (|| 0)
+                    const safeXCount = acc.x_count !== undefined && acc.x_count !== null ? acc.x_count : '--';
+                    const safeDbCount = acc.db_count !== undefined && acc.db_count !== null ? acc.db_count : '--';
+
                     const div = document.createElement('div');
                     div.className = `rounded-lg border mb-2 transition-colors ${cardBg}`;
                     div.innerHTML = `
@@ -297,8 +318,8 @@
                                         ${acc.is_fast ? `<span class="text-yellow-500 text-[10px] ml-1" title="Hızlı Mod">⚡</span>` : ''}
                                     </div>
                                     <div class="text-[10px] text-gray-400 mt-1 flex space-x-3">
-                                        <span><i class="fa-brands fa-x-twitter opacity-70"></i> X: <b class="text-inherit">${acc.x_count}</b></span>
-                                        <span><i class="fa-solid fa-database opacity-70"></i> DB: <b class="text-inherit">${acc.db_count}</b></span>
+                                        <span><i class="fa-brands fa-x-twitter opacity-70"></i> X: <b class="text-inherit">${safeXCount}</b></span>
+                                        <span><i class="fa-solid fa-database opacity-70"></i> DB: <b class="text-inherit">${safeDbCount}</b></span>
                                     </div>
                                 </div>
                             </div>
@@ -321,7 +342,7 @@
 
         function refreshData() {
             document.getElementById('stat-phase').innerText = "Yenileniyor...";
-            document.getElementById('stat-phase').className = "text-[10px] font-bold text-yellow-500 px-2 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20 truncate max-w-[100px]";
+            document.getElementById('stat-phase').className = "text-[10px] font-bold text-yellow-500 px-2 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20 truncate max-w-[100px] cursor-pointer hover:bg-yellow-500/20 transition";
             fetchLiveStats();
         }
 
