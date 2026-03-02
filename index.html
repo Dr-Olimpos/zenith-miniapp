@@ -8,87 +8,141 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body {
-            background-color: var(--tg-theme-bg-color, #111827);
-            color: var(--tg-theme-text-color, #f3f4f6);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-        .tg-card {
-            background-color: var(--tg-theme-secondary-bg-color, #1f2937);
-        }
-        .accordion-content {
-            transition: max-height 0.3s ease-out, opacity 0.3s ease;
-            max-height: 0;
-            opacity: 0;
-            overflow: hidden;
-        }
-        .accordion-content.open {
-            max-height: 800px;
-            opacity: 1;
-            overflow-y: auto;
-        }
-        /* Özel Scrollbar */
+        /* Telegram zorunlu temalarını eziyoruz ki gece gündüz modu çalışsın */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+        .accordion-content { transition: max-height 0.3s ease-out, opacity 0.3s ease; max-height: 0; opacity: 0; overflow: hidden; }
+        .accordion-content.open { max-height: 1200px; opacity: 1; overflow-y: auto; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 10px; }
     </style>
 </head>
-<body class="p-4 antialiased">
+<!-- Ana Container: Gece/Gündüz Renkleri Burada Değişecek -->
+<body id="app-container" class="min-h-screen bg-gray-900 text-white transition-colors duration-300 p-4 antialiased">
 
-    <!-- Üst Başlık -->
+    <!-- Üst Başlık ve Tema Butonu -->
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center space-x-2">
             <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/50">Z</div>
-            <h1 class="text-xl font-bold tracking-wider">ZENITH <span class="text-blue-400">APEX</span></h1>
+            <h1 class="text-xl font-bold tracking-wider text-inherit">ZENITH <span class="text-blue-500">APEX</span></h1>
         </div>
-        <div id="stat-phase" class="text-[10px] font-bold text-blue-400 px-2 py-1 bg-blue-500/10 rounded-full border border-blue-500/20 truncate max-w-[120px]">Bağlanıyor...</div>
+        <div class="flex items-center space-x-3">
+            <div id="stat-phase" class="text-[10px] font-bold text-blue-500 px-2 py-1 bg-blue-500/10 rounded-full border border-blue-500/20 truncate max-w-[100px]">Bağlanıyor...</div>
+            <!-- Gece/Gündüz Modu Butonu -->
+            <button onclick="toggleTheme()" class="w-8 h-8 rounded-full bg-gray-800 text-yellow-400 border border-gray-700 flex items-center justify-center transition active:scale-90" id="themeBtn">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Airtable Tarzı Filtreleme Paneli -->
-    <div class="tg-card rounded-xl p-3 mb-4 shadow-sm border border-gray-700/50">
+    <div id="filter-card" class="bg-gray-800 rounded-xl p-3 mb-4 shadow-sm border border-gray-700 transition-colors">
         <div class="flex gap-2">
-            <!-- Arama Kutusu -->
             <div class="relative flex-1">
                 <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs"></i>
-                <input type="text" id="searchInput" placeholder="Hesap ara..." class="w-full bg-gray-800/50 border border-gray-700 rounded-lg py-2 pl-8 pr-3 text-xs text-white focus:outline-none focus:border-blue-500 transition">
+                <input type="text" id="searchInput" placeholder="Hesap ara..." class="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-8 pr-3 text-xs text-inherit focus:outline-none focus:border-blue-500 transition-colors">
             </div>
-            <!-- Kategori Seçici -->
-            <select id="categoryFilter" class="bg-gray-800/50 border border-gray-700 rounded-lg py-2 px-2 text-xs text-white focus:outline-none focus:border-blue-500 transition min-w-[100px]">
+            <select id="categoryFilter" class="bg-gray-900 border border-gray-700 rounded-lg py-2 px-2 text-xs text-inherit focus:outline-none focus:border-blue-500 transition-colors min-w-[100px]">
                 <option value="ALL">Tüm Sektörler</option>
-                <!-- Kategoriler JS ile dolacak -->
             </select>
         </div>
     </div>
 
-    <!-- İstatistik ve Araç Çubuğu -->
+    <!-- Favoriler ve Tümü Sekmeleri -->
+    <div class="flex space-x-2 mb-4 bg-gray-800 p-1 rounded-lg border border-gray-700 transition-colors" id="tab-container">
+        <button onclick="switchTab('ALL')" id="tab-all" class="flex-1 py-1.5 text-xs font-bold rounded-md bg-blue-500/20 text-blue-400 transition-colors">📋 Tüm Liste</button>
+        <button onclick="switchTab('FAV')" id="tab-fav" class="flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500 hover:text-gray-300 transition-colors">⭐ Favoriler</button>
+    </div>
+
+    <!-- İstatistik Çubuğu -->
     <div class="flex justify-between items-center mb-3 px-1">
-        <div class="text-xs text-gray-400">
-            <span class="font-bold text-white" id="visibleCount">0</span> Hesap Gösteriliyor
+        <div class="text-xs text-gray-500">
+            <span class="font-bold text-inherit" id="visibleCount">0</span> Hesap Gösteriliyor
         </div>
-        <button onclick="refreshData()" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded-full border border-gray-700 transition flex items-center">
+        <button onclick="refreshData()" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded-full border border-gray-700 transition flex items-center text-inherit" id="refreshBtn">
             <i class="fa-solid fa-rotate mr-1"></i> Yenile
         </button>
     </div>
     
-    <!-- Dinamik Liste (Tablo Arayüzü) -->
-    <div id="fleet-container" class="space-y-3 pb-10">
+    <!-- Dinamik Tablo Arayüzü -->
+    <div id="fleet-container" class="space-y-4 pb-10">
         <p class="text-xs text-gray-500 italic text-center py-10">Güvenli tünel aranıyor, lütfen bekleyin...</p>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand(); 
-        
         tg.MainButton.setText('DASHBOARD KAPAT');
         tg.MainButton.show();
         tg.MainButton.onClick(function() { tg.close(); });
 
-        let globalAccounts = []; // Arama ve filtreleme için veriyi hafızada tutarız
+        let globalAccounts = [];
+        let currentTab = 'ALL'; // ALL veya FAV
+        let isDarkMode = true;
+
+        // Gece Gündüz Modu
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            const body = document.getElementById('app-container');
+            const themeBtn = document.getElementById('themeBtn');
+            const filterCard = document.getElementById('filter-card');
+            const searchInput = document.getElementById('searchInput');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const tabContainer = document.getElementById('tab-container');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            if(isDarkMode) {
+                body.className = "min-h-screen bg-gray-900 text-white transition-colors duration-300 p-4 antialiased";
+                themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+                themeBtn.className = "w-8 h-8 rounded-full bg-gray-800 text-yellow-400 border border-gray-700 flex items-center justify-center transition active:scale-90";
+                filterCard.className = "bg-gray-800 rounded-xl p-3 mb-4 shadow-sm border border-gray-700 transition-colors";
+                searchInput.className = "w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-8 pr-3 text-xs text-inherit focus:outline-none focus:border-blue-500 transition-colors";
+                categoryFilter.className = "bg-gray-900 border border-gray-700 rounded-lg py-2 px-2 text-xs text-inherit focus:outline-none focus:border-blue-500 transition-colors min-w-[100px]";
+                tabContainer.className = "flex space-x-2 mb-4 bg-gray-800 p-1 rounded-lg border border-gray-700 transition-colors";
+                refreshBtn.className = "text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded-full border border-gray-700 transition flex items-center text-inherit";
+            } else {
+                body.className = "min-h-screen bg-gray-100 text-gray-900 transition-colors duration-300 p-4 antialiased";
+                themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+                themeBtn.className = "w-8 h-8 rounded-full bg-white text-orange-500 border border-gray-300 shadow-sm flex items-center justify-center transition active:scale-90";
+                filterCard.className = "bg-white rounded-xl p-3 mb-4 shadow-sm border border-gray-200 transition-colors";
+                searchInput.className = "w-full bg-gray-50 border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs text-inherit focus:outline-none focus:border-blue-500 transition-colors";
+                categoryFilter.className = "bg-gray-50 border border-gray-200 rounded-lg py-2 px-2 text-xs text-inherit focus:outline-none focus:border-blue-500 transition-colors min-w-[100px]";
+                tabContainer.className = "flex space-x-2 mb-4 bg-white p-1 rounded-lg border border-gray-200 transition-colors";
+                refreshBtn.className = "text-xs bg-white hover:bg-gray-100 px-3 py-1 rounded-full border border-gray-200 shadow-sm transition flex items-center text-inherit";
+            }
+            renderList(); // Kart renklerini de yenile
+        }
+
+        // Favoriler Sekmesi
+        function switchTab(tab) {
+            currentTab = tab;
+            const tabAll = document.getElementById('tab-all');
+            const tabFav = document.getElementById('tab-fav');
+            
+            if(tab === 'ALL') {
+                tabAll.className = "flex-1 py-1.5 text-xs font-bold rounded-md bg-blue-500/20 text-blue-500 transition-colors";
+                tabFav.className = "flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500 hover:text-gray-400 transition-colors";
+            } else {
+                tabFav.className = "flex-1 py-1.5 text-xs font-bold rounded-md bg-yellow-500/20 text-yellow-600 transition-colors";
+                tabAll.className = "flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500 hover:text-gray-400 transition-colors";
+            }
+            renderList();
+        }
+
+        function toggleFavorite(username, event) {
+            event.stopPropagation(); // Akordeonu açmayı engelle
+            const key = 'fav_' + username;
+            if(localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+            } else {
+                localStorage.setItem(key, 'true');
+            }
+            renderList();
+        }
 
         window.toggleHistory = function(id) {
             const content = document.getElementById(id);
             const icon = document.getElementById('icon-' + id);
-            
             if (content.classList.contains('open')) {
                 content.classList.remove('open');
                 icon.style.transform = 'rotate(0deg)';
@@ -98,7 +152,6 @@
             }
         }
 
-        // Trojan/Maestro gibi botlara Telegram içinden yönlendirme yapar
         window.tradeSniper = function(username) {
             const botUrl = `https://t.me/solana_trojanbot?start=r-${username}`;
             tg.openTelegramLink(botUrl);
@@ -109,77 +162,46 @@
             let finalData = null;
             let isSuccess = false;
 
-            // ZENGİNLEŞTİRİLMİŞ PROXY HAVUZU (Ekstra proxy eklendi)
             const proxies = [
                 { url: 'https://corsproxy.io/?', type: 'direct'},
                 { url: 'https://api.allorigins.win/raw?url=', type: 'direct' },
-                { url: 'https://api.codetabs.com/v1/proxy?quest=', type: 'direct' },
-                { url: 'https://thingproxy.freeboard.io/fetch/', type: 'direct' }, // Ekstra proxy
-                { url: 'https://api.allorigins.win/get?url=', type: 'contents' } // Güçlü fallback proxy
+                { url: 'https://api.codetabs.com/v1/proxy?quest=', type: 'direct' }
             ];
-
-            if (window.location.protocol === 'http:') {
-                proxies.unshift({ url: '', type: 'direct' }); 
-            }
+            if (window.location.protocol === 'http:') proxies.unshift({ url: '', type: 'direct' }); 
 
             for (let proxy of proxies) {
                 try {
                     const fetchUrl = proxy.url === '' ? targetUrl : proxy.url + encodeURIComponent(targetUrl);
                     const response = await fetch(fetchUrl, {
-                        method: 'GET',
-                        cache: 'no-store',
-                        signal: AbortSignal.timeout(25000) // Zaman aşımı 25 saniyeye (25000ms) çıkarıldı!
+                        method: 'GET', cache: 'no-store', signal: AbortSignal.timeout(25000) 
                     });
-                    
                     if (response.ok) {
                         let data = proxy.type === 'contents' ? JSON.parse((await response.json()).contents) : await response.json();
                         if (data && typeof data === 'object' && 'monitored_count' in data) {
-                            finalData = data;
-                            isSuccess = true;
-                            console.log("Bağlantı başarılı. Kullanılan Proxy:", proxy.url || "Direkt");
-                            break; 
+                            finalData = data; isSuccess = true; break; 
                         }
                     }
-                } catch (error) {
-                    console.warn(`[Proxy Atlandı] ${proxy.url || 'Direct'} yanıt vermedi:`, error.message);
-                }
+                } catch (error) {}
             }
 
             if (isSuccess && finalData) {
-                document.getElementById('stat-phase').innerText = "Canlı Akış Aktif";
-                document.getElementById('stat-phase').className = "text-[10px] font-bold text-green-400 px-2 py-1 bg-green-500/10 rounded-full border border-green-500/20 truncate max-w-[120px]";
-                
+                document.getElementById('stat-phase').innerText = finalData.status || "Canlı Akış";
+                document.getElementById('stat-phase').className = "text-[10px] font-bold text-green-500 px-2 py-1 bg-green-500/10 rounded-full border border-green-500/20 truncate max-w-[100px]";
                 globalAccounts = finalData.accounts || [];
                 updateCategoryDropdown();
-                renderList(); // Arayüzü çiz
+                renderList(); 
             } else {
-                document.getElementById('stat-phase').innerText = "Bağlantı Hatası!";
-                document.getElementById('stat-phase').className = "text-[10px] font-bold text-red-400 px-2 py-1 bg-red-500/10 rounded-full border border-red-500/20 truncate max-w-[120px]";
-                
-                const container = document.getElementById('fleet-container');
-                if (container.innerHTML.includes('Güvenli tünel') || container.innerHTML.includes('Yenileniyor')) {
-                     container.innerHTML = `
-                        <div class="p-3 border border-red-500/30 rounded-lg bg-red-500/10 text-center">
-                            <p class="text-xs text-red-400 font-bold mb-1">⚠️ Sunucuya Ulaşılamıyor!</p>
-                            <p class="text-[10px] text-gray-400">Proxy tünellerinin hepsi zaman aşımına uğradı. Sunucunuzun (165.232.68.11:8080) çalıştığını kontrol edin.</p>
-                        </div>
-                    `;
-                }
+                document.getElementById('stat-phase').innerText = "Hata!";
+                document.getElementById('stat-phase').className = "text-[10px] font-bold text-red-500 px-2 py-1 bg-red-500/10 rounded-full border border-red-500/20 truncate max-w-[100px]";
             }
         }
 
         function updateCategoryDropdown() {
             const select = document.getElementById('categoryFilter');
             const currentVal = select.value;
-            
-            // Tüm benzersiz kategorileri bul
             const categories = [...new Set(globalAccounts.map(a => `${a.cat_emoji || '🌐'} ${a.cat_name || 'Genel'}`))];
-            
             let html = '<option value="ALL">Tüm Kategoriler</option>';
-            categories.sort().forEach(cat => {
-                html += `<option value="${cat}">${cat}</option>`;
-            });
-            
+            categories.sort().forEach(cat => { html += `<option value="${cat}">${cat}</option>`; });
             select.innerHTML = html;
             select.value = categories.includes(currentVal) ? currentVal : "ALL";
         }
@@ -189,88 +211,122 @@
             const categoryFilter = document.getElementById('categoryFilter').value;
             const container = document.getElementById('fleet-container');
             
-            // Filtreleme Mantığı
+            // Renk Değişkenleri (Gece/Gündüz Modu İçin)
+            const cardBg = isDarkMode ? 'bg-gray-800 border-gray-700/50' : 'bg-white border-gray-200 shadow-sm';
+            const historyBg = isDarkMode ? 'bg-[#17202e] border-gray-700/50' : 'bg-gray-50 border-gray-200';
+            const linkBg = isDarkMode ? 'bg-gray-800/80 border-gray-700/50 hover:bg-gray-700/80' : 'bg-white border-gray-200 shadow-sm hover:bg-gray-50';
+            const badgeBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200 text-gray-600';
+
             const filtered = globalAccounts.filter(acc => {
                 const matchSearch = acc.username.toLowerCase().includes(searchTerm);
                 const accCat = `${acc.cat_emoji || '🌐'} ${acc.cat_name || 'Genel'}`;
                 const matchCat = categoryFilter === "ALL" || accCat === categoryFilter;
-                return matchSearch && matchCat;
+                
+                // Favori Filtresi
+                const isFav = localStorage.getItem('fav_' + acc.username) !== null;
+                const matchTab = currentTab === 'ALL' || (currentTab === 'FAV' && isFav);
+
+                return matchSearch && matchCat && matchTab;
             });
 
             document.getElementById('visibleCount').innerText = filtered.length;
             container.innerHTML = '';
 
             if (filtered.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-gray-500 text-xs">Aradığınız kriterde sonuç bulunamadı.</div>';
+                container.innerHTML = '<div class="text-center py-8 text-gray-500 text-xs">Hesap bulunamadı.</div>';
                 return;
             }
 
-            // Gelişmiş Tablo Kartları Çizimi
-            filtered.forEach((acc, index) => {
-                const histId = `hist-${index}`;
-                
-                // History İşlemleri & Trade Butonları
-                let historyHtml = '<div class="p-3 bg-[#17202e] text-xs text-gray-500 italic rounded-b-lg">Son 7 günde yeni takip yok.</div>';
-                if (acc.history && acc.history.length > 0) {
-                    const links = acc.history.map(h => `
-                        <div class="flex justify-between items-center p-2 mb-1 bg-gray-800/80 hover:bg-gray-700/80 rounded border border-gray-700/50 transition">
-                            <a href="https://x.com/${h.nick}" target="_blank" class="flex-1 text-blue-400 font-medium flex items-center">
-                                <i class="fa-brands fa-twitter mr-2"></i> @${h.nick}
-                            </a>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-[9px] text-gray-500">${h.added_at}</span>
-                                <!-- TRADE BUTONU (Telegram Mini App İçi Sniper) -->
-                                <button onclick="tradeSniper('${h.nick}')" class="bg-green-500/20 hover:bg-green-500/40 text-green-400 border border-green-500/30 px-2 py-1 rounded shadow-sm transition active:scale-95 flex items-center">
-                                    <i class="fa-solid fa-crosshairs mr-1"></i> Trade
-                                </button>
-                            </div>
-                        </div>
-                    `).join('');
-                    historyHtml = `<div class="p-2 bg-[#17202e] rounded-b-lg border-t border-gray-700/50">${links}</div>`;
-                }
+            const grouped = {};
+            filtered.forEach(acc => {
+                const cat = `${acc.cat_emoji || '🌐'} ${acc.cat_name || 'Genel'}`;
+                if(!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(acc);
+            });
 
-                const div = document.createElement('div');
-                div.className = 'tg-card rounded-lg border border-gray-700/30 shadow-sm';
-                
-                div.innerHTML = `
-                    <div class="p-3 flex justify-between items-center cursor-pointer active:bg-gray-700 transition rounded-lg" onclick="toggleHistory('${histId}')">
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-sm font-bold">@${acc.username || 'Bilinmiyor'}</span>
-                                <span class="text-[9px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700">${acc.cat_emoji} ${acc.cat_name}</span>
+            let globalIndex = 0;
+
+            Object.keys(grouped).sort().forEach(category => {
+                const catHeader = document.createElement('div');
+                catHeader.className = 'text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 mt-4 ml-1 border-b border-gray-500/30 pb-1';
+                catHeader.innerText = category;
+                container.appendChild(catHeader);
+
+                grouped[category].forEach(acc => {
+                    const histId = `hist-${globalIndex++}`;
+                    const isFav = localStorage.getItem('fav_' + acc.username) !== null;
+                    const starIcon = isFav ? '<i class="fa-solid fa-star text-yellow-400"></i>' : '<i class="fa-regular fa-star text-gray-400"></i>';
+                    
+                    let historyHtml = `<div class="p-3 ${historyBg} text-xs text-gray-500 italic rounded-b-lg">Son 7 günde yeni takip yok.</div>`;
+                    if (acc.history && acc.history.length > 0) {
+                        const links = acc.history.map(h => {
+                            let tradeBtn = '';
+                            if (h.contract && h.chain) {
+                                if (h.chain === 'solana') {
+                                    tradeBtn = `<button onclick="tg.openTelegramLink('https://t.me/solana_trojanbot?start=r-${h.contract}')" class="bg-purple-500/10 text-purple-500 border border-purple-500/20 px-2 py-1 rounded shadow-sm transition active:scale-95 flex items-center font-bold"><i class="fa-solid fa-bolt mr-1"></i> SOL</button>`;
+                                } else {
+                                    tradeBtn = `<button onclick="tg.openTelegramLink('https://t.me/maestro?start=${h.contract}')" class="bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2 py-1 rounded shadow-sm transition active:scale-95 flex items-center font-bold"><i class="fa-solid fa-robot mr-1"></i> ETH/BASE</button>`;
+                                }
+                            } else {
+                                tradeBtn = `<button onclick="tg.openTelegramLink('https://x.com/${h.nick}')" class="bg-gray-500/10 text-gray-500 border border-gray-500/20 px-2 py-1 rounded shadow-sm transition active:scale-95 flex items-center"><i class="fa-solid fa-magnifying-glass mr-1"></i> Ara</button>`;
+                            }
+
+                            return `
+                            <div class="flex justify-between items-center p-2 mb-1 ${linkBg} rounded border transition">
+                                <a href="https://x.com/${h.nick}" target="_blank" class="flex-1 text-blue-500 font-medium flex items-center text-xs truncate mr-2">
+                                    <i class="fa-brands fa-twitter mr-1.5"></i> @${h.nick}
+                                </a>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-[9px] text-gray-400 hidden sm:inline">${h.added_at}</span>
+                                    ${tradeBtn}
+                                </div>
+                            </div>`;
+                        }).join('');
+                        historyHtml = `<div class="p-2 ${historyBg} rounded-b-lg border-t">${links}</div>`;
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = `rounded-lg border mb-2 transition-colors ${cardBg}`;
+                    div.innerHTML = `
+                        <div class="p-3 flex justify-between items-center cursor-pointer rounded-lg" onclick="toggleHistory('${histId}')">
+                            <div class="flex items-center">
+                                <button onclick="toggleFavorite('${acc.username}', event)" class="mr-3 text-lg transition hover:scale-110">${starIcon}</button>
+                                <div>
+                                    <div class="flex items-center">
+                                        <span class="text-sm font-bold">@${acc.username || 'Bilinmiyor'}</span>
+                                        ${acc.is_fast ? `<span class="text-yellow-500 text-[10px] ml-1" title="Hızlı Mod">⚡</span>` : ''}
+                                    </div>
+                                    <div class="text-[10px] text-gray-400 mt-1 flex space-x-3">
+                                        <span><i class="fa-brands fa-x-twitter opacity-70"></i> X: <b class="text-inherit">${acc.x_count}</b></span>
+                                        <span><i class="fa-solid fa-database opacity-70"></i> DB: <b class="text-inherit">${acc.db_count}</b></span>
+                                    </div>
+                                </div>
                             </div>
-                            <!-- X ve DB Sayıları Senkronizasyonu -->
-                            <div class="text-[10px] text-gray-400 mt-1 flex space-x-3">
-                                <span><i class="fa-brands fa-x-twitter text-gray-500"></i> X: <b class="text-gray-300">${acc.x_count}</b></span>
-                                <span><i class="fa-solid fa-database text-gray-500"></i> DB: <b class="text-gray-300">${acc.db_count}</b></span>
+                            <div class="flex items-center text-gray-400">
+                                <span class="text-[10px] mr-2 ${acc.history?.length > 0 ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : badgeBg} border px-2 py-0.5 rounded font-bold">${acc.history ? acc.history.length : 0} Yeni</span>
+                                <i id="icon-${histId}" class="fa-solid fa-chevron-down transition-transform duration-300"></i>
                             </div>
                         </div>
-                        <div class="flex items-center text-gray-500">
-                            <span class="text-[10px] mr-2 ${acc.history?.length > 0 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-gray-800 text-gray-500 border-gray-700'} border px-2 py-0.5 rounded font-bold">${acc.history ? acc.history.length : 0} Yeni</span>
-                            <i id="icon-${histId}" class="fa-solid fa-chevron-down transition-transform duration-300"></i>
+                        <div id="${histId}" class="accordion-content">
+                            ${historyHtml}
                         </div>
-                    </div>
-                    <div id="${histId}" class="accordion-content">
-                        ${historyHtml}
-                    </div>
-                `;
-                container.appendChild(div);
+                    `;
+                    container.appendChild(div);
+                });
             });
         }
 
-        // Filtre Dinleyicileri
         document.getElementById('searchInput').addEventListener('input', renderList);
         document.getElementById('categoryFilter').addEventListener('change', renderList);
 
         function refreshData() {
             document.getElementById('stat-phase').innerText = "Yenileniyor...";
-            document.getElementById('stat-phase').className = "text-[10px] font-bold text-yellow-500 px-2 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20 truncate max-w-[120px]";
+            document.getElementById('stat-phase').className = "text-[10px] font-bold text-yellow-500 px-2 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20 truncate max-w-[100px]";
             fetchLiveStats();
         }
 
-        // Başlat ve döngüye al
         fetchLiveStats();
-        setInterval(fetchLiveStats, 30000); // Yenileme süresi proxy limitine takılmamak için 30 saniyeye uzatıldı
+        setInterval(fetchLiveStats, 30000); 
     </script>
 </body>
 </html>
