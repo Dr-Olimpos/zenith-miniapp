@@ -20,6 +20,17 @@
             background-color: var(--tg-theme-button-color, #3b82f6);
             color: var(--tg-theme-button-text-color, #ffffff);
         }
+        .accordion-content {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .accordion-content.open {
+            max-height: 500px; /* İçeriğe göre genişler */
+            opacity: 1;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body class="p-4 antialiased">
@@ -45,31 +56,18 @@
             <div class="flex items-center text-green-400 mb-1 text-xs uppercase font-bold tracking-wider">
                 <i class="fa-solid fa-bolt mr-2"></i> Canlı Faz
             </div>
-            <div id="stat-phase" class="text-xs font-bold text-blue-400 mt-2">Bağlanıyor...</div>
+            <div id="stat-phase" class="text-[10px] font-bold text-blue-400 mt-2 truncate">Bağlanıyor...</div>
         </div>
     </div>
 
-    <!-- Dinamik Filo Listesi -->
-    <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-700/50 pb-2">📋 İzleme Filosu</h2>
-    <div id="fleet-container" class="space-y-2 mb-6 max-h-80 overflow-y-auto pr-1">
-        <p class="text-xs text-gray-500 italic">Güvenli tünel aranıyor, lütfen bekleyin...</p>
+    <!-- Dinamik ve Kategorize Edilmiş Filo Listesi -->
+    <div class="flex justify-between items-center mb-3 border-b border-gray-700/50 pb-2">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400">📋 İstihbarat Ağı</h2>
+        <button onclick="refreshData()" class="text-xs text-blue-400 flex items-center"><i class="fa-solid fa-rotate mr-1"></i> Yenile</button>
     </div>
-
-    <!-- Hızlı İşlem Araçları -->
-    <h2 class="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-700/50 pb-2">⚙️ Hızlı İşlemler</h2>
-    <div class="grid grid-cols-2 gap-3">
-        <button onclick="Telegram.WebApp.showAlert('🚀 Manuel tarama başlatmak için Telegram bot menüsündeki butonları kullanın.')" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
-            <div class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mb-2">
-                <i class="fa-solid fa-radar"></i>
-            </div>
-            <span class="text-xs font-bold">Manuel Tara</span>
-        </button>
-        <button onclick="refreshData()" class="tg-card p-3 rounded-xl flex flex-col items-center justify-center text-center active:bg-gray-700 transition border border-gray-700/50">
-            <div class="w-10 h-10 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center mb-2">
-                <i class="fa-solid fa-rotate"></i>
-            </div>
-            <span class="text-xs font-bold">Listeyi Yenile</span>
-        </button>
+    
+    <div id="fleet-container" class="space-y-4 mb-6 pb-10">
+        <p class="text-xs text-gray-500 italic">Güvenli tünel aranıyor, lütfen bekleyin...</p>
     </div>
 
     <script>
@@ -84,20 +82,33 @@
         tg.MainButton.show();
         tg.MainButton.onClick(function() { tg.close(); });
 
+        // Akordeon aç/kapat fonksiyonu
+        window.toggleHistory = function(id) {
+            const content = document.getElementById(id);
+            const icon = document.getElementById('icon-' + id);
+            
+            if (content.classList.contains('open')) {
+                content.classList.remove('open');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.classList.add('open');
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
         async function fetchLiveStats() {
             const targetUrl = 'http://165.232.68.11:8080/api/stats';
             let finalData = null;
             let isSuccess = false;
 
-            // GELİŞMİŞ PROXY HAVUZU
-            // Bazı proxyler JSON'ı direkt verirken, bazıları 'contents' içine saklar.
+            // GELİŞMİŞ PROXY HAVUZU (Bağlantı kopmasını engeller)
             const proxies = [
-                { url: 'https://api.allorigins.win/get?url=', type: 'contents' }, // En stabili, ama ayrıştırma gerektirir
-                { url: 'https://thingproxy.freeboard.io/fetch/', type: 'direct' }, // Yeni ve stabil
-                { url: 'https://api.codetabs.com/v1/proxy?quest=', type: 'direct' }
+                { url: 'https://api.allorigins.win/get?url=', type: 'contents' }, 
+                { url: 'https://thingproxy.freeboard.io/fetch/', type: 'direct' },
+                { url: 'https://api.codetabs.com/v1/proxy?quest=', type: 'direct' },
+                { url: 'https://corsproxy.io/?', type: 'direct'}
             ];
 
-            // Eğer tarayıcı HTTP ise (Masaüstü Telegram vb.) proxy'siz doğrudan bağlanmayı ilk sıraya koy.
             if (window.location.protocol === 'http:') {
                 proxies.unshift({ url: '', type: 'direct' }); 
             }
@@ -109,13 +120,12 @@
                     const response = await fetch(fetchUrl, {
                         method: 'GET',
                         cache: 'no-store',
-                        signal: AbortSignal.timeout(6000) // 6 saniye bekle
+                        signal: AbortSignal.timeout(6000) 
                     });
                     
                     if (response.ok) {
                         let data;
                         if (proxy.type === 'contents') {
-                            // AllOrigins veriyi text olarak contents içine gömer
                             const rawData = await response.json();
                             if (rawData && rawData.contents) {
                                 data = JSON.parse(rawData.contents);
@@ -124,16 +134,15 @@
                             data = await response.json();
                         }
                         
-                        // Gelen verinin bozuk olup olmadığını (Gerçekten botumuzdan mı geldiğini) kontrol et
                         if (data && typeof data === 'object' && 'monitored_count' in data) {
                             finalData = data;
                             isSuccess = true;
-                            console.log("Bağlantı başarılı. Kullanılan Proxy:", proxy.url || "Direkt (Proxy Yok)");
-                            break; // Başarılıysa diğerlerini denemeyi bırak!
+                            console.log("Bağlantı başarılı. Kullanılan Proxy:", proxy.url || "Direkt");
+                            break; 
                         }
                     }
                 } catch (error) {
-                    console.warn(`[Proxy Atlandı] ${proxy.url || 'Direct'} yanıt vermedi veya veri bozuk.`);
+                    console.warn(`[Proxy Atlandı] ${proxy.url || 'Direct'} yanıt vermedi.`);
                 }
             }
 
@@ -147,36 +156,79 @@
                 
                 const phaseEl = document.getElementById('stat-phase');
                 phaseEl.innerText = finalData.status || "Veri Bekleniyor";
-                phaseEl.className = "text-xs font-bold text-green-400 mt-2";
+                phaseEl.className = "text-[10px] font-bold text-green-400 mt-2 truncate";
 
-                // Hesap Listesini Oluştur
-                const fleetContainer = document.getElementById('fleet-container');
+                // Verileri Kategoriye Göre Grupla
+                const groupedAccounts = {};
                 if (finalData.accounts && finalData.accounts.length > 0) {
-                    fleetContainer.innerHTML = '';
                     finalData.accounts.forEach(acc => {
-                        const div = document.createElement('div');
-                        div.className = 'tg-card p-3 rounded-lg border border-gray-700/30 flex justify-between items-center';
-                        div.innerHTML = `
-                            <div>
-                                <span class="text-sm font-bold">@${acc.username || 'Bilinmiyor'}</span>
-                                <div class="text-[10px] text-gray-500">${acc.cat_emoji || '🌐'} ${acc.cat_name || 'Genel'}</div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-xs font-mono text-blue-400">${acc.following || 0}</div>
-                                <div class="text-[8px] uppercase text-gray-600 tracking-tighter">Takip</div>
-                            </div>
-                        `;
-                        fleetContainer.appendChild(div);
+                        const catKey = `${acc.cat_emoji || '🌐'} ${acc.cat_name || 'Genel'}`;
+                        if (!groupedAccounts[catKey]) groupedAccounts[catKey] = [];
+                        groupedAccounts[catKey].push(acc);
                     });
+
+                    const fleetContainer = document.getElementById('fleet-container');
+                    fleetContainer.innerHTML = '';
+                    
+                    let globalIndex = 0;
+
+                    // Grupları Ekrana Çiz
+                    for (const [category, accounts] of Object.entries(groupedAccounts)) {
+                        const catHeader = document.createElement('div');
+                        catHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4 ml-1';
+                        catHeader.innerText = category;
+                        fleetContainer.appendChild(catHeader);
+
+                        accounts.forEach(acc => {
+                            const histId = `hist-${globalIndex}`;
+                            globalIndex++;
+
+                            // Tarihçeyi HTML'e çevir
+                            let historyHtml = '<div class="p-3 bg-[#17202e] text-xs text-gray-500 italic rounded-b-lg">Son 7 günde yeni takip yok.</div>';
+                            
+                            if (acc.history && acc.history.length > 0) {
+                                const links = acc.history.map(h => 
+                                    `<a href="https://x.com/${h.nick}" target="_blank" class="flex justify-between items-center p-2 mb-1 bg-gray-800 hover:bg-gray-700 rounded transition">
+                                        <span class="text-blue-400 font-medium"><i class="fa-brands fa-twitter mr-1"></i> @${h.nick}</span>
+                                        <span class="text-[10px] text-gray-500">${h.added_at}</span>
+                                    </a>`
+                                ).join('');
+                                
+                                historyHtml = `<div class="p-2 bg-[#17202e] rounded-b-lg border-t border-gray-700/50">${links}</div>`;
+                            }
+
+                            const div = document.createElement('div');
+                            div.className = 'tg-card rounded-lg border border-gray-700/30 mb-2 shadow-sm';
+                            
+                            div.innerHTML = `
+                                <!-- Tıklanabilir Üst Kısım -->
+                                <div class="p-3 flex justify-between items-center cursor-pointer active:bg-gray-700 transition rounded-lg" onclick="toggleHistory('${histId}')">
+                                    <div>
+                                        <span class="text-sm font-bold">@${acc.username || 'Bilinmiyor'}</span>
+                                        <div class="text-[10px] text-gray-400 mt-0.5">Takipler: ${acc.following || 0}</div>
+                                    </div>
+                                    <div class="flex items-center text-gray-500">
+                                        <span class="text-[10px] mr-2 bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">${acc.history ? acc.history.length : 0} Yeni</span>
+                                        <i id="icon-${histId}" class="fa-solid fa-chevron-down transition-transform duration-300"></i>
+                                    </div>
+                                </div>
+                                <!-- Açılır/Kapanır Geçmiş İçeriği -->
+                                <div id="${histId}" class="accordion-content">
+                                    ${historyHtml}
+                                </div>
+                            `;
+                            fleetContainer.appendChild(div);
+                        });
+                    }
                 } else {
-                    fleetContainer.innerHTML = '<p class="text-xs text-gray-500 italic">Henüz hesap eklenmemiş veya veritabanı boş.</p>';
+                    document.getElementById('fleet-container').innerHTML = '<p class="text-xs text-gray-500 italic">Henüz hesap eklenmemiş veya veritabanı boş.</p>';
                 }
                 
             } catch (error) {
                 console.error("Nihai bağlantı hatası detayı:", error);
                 const phaseEl = document.getElementById('stat-phase');
                 phaseEl.innerText = "Tüneller Çöktü!";
-                phaseEl.className = "text-xs font-bold text-red-400 mt-2"; 
+                phaseEl.className = "text-[10px] font-bold text-red-400 mt-2 truncate"; 
                 
                 const fleetContainer = document.getElementById('fleet-container');
                 if (fleetContainer.innerHTML.includes('Güvenli tünel') || fleetContainer.innerHTML.includes('Yenileniyor')) {
@@ -194,12 +246,12 @@
         function refreshData() {
             const phaseEl = document.getElementById('stat-phase');
             phaseEl.innerText = "Güvenli Tünel Aranıyor...";
-            phaseEl.className = "text-[10px] font-bold text-blue-400 mt-2";
+            phaseEl.className = "text-[10px] font-bold text-blue-400 mt-2 truncate";
             fetchLiveStats();
         }
 
         fetchLiveStats();
-        // Proxy sunucularını yormamak için yenileme süresi 15 saniyede tutuldu.
+        // 15 Saniyede bir otomatik yeniler
         setInterval(fetchLiveStats, 15000);
     </script>
 </body>
